@@ -14,7 +14,6 @@ import (
 	"github.com/lima-vm/go-qcow2reader"
 	"github.com/lima-vm/go-qcow2reader/image/qcow2"
 	"github.com/lima-vm/go-qcow2reader/image/raw"
-	"github.com/lima-vm/lima/pkg/osutil"
 	"github.com/lima-vm/lima/pkg/progressbar"
 	"github.com/sirupsen/logrus"
 )
@@ -67,6 +66,13 @@ func ConvertToRaw(source, dest string, size *int64, allowSourceWithBackingFile b
 	destTmp := destTmpF.Name()
 	defer os.RemoveAll(destTmp)
 	defer destTmpF.Close()
+
+	// Truncating before copy eliminates the seeks during copy and provide a
+	// hint to the file system that may minimize allocations and fragmanation
+	// of the file.
+	if err := MakeSparse(destTmpF, srcImg.Size()); err != nil {
+		return err
+	}
 
 	// Copy
 	srcImgR := io.NewSectionReader(srcImg, 0, srcImg.Size())
@@ -124,8 +130,8 @@ func convertRawToRaw(source, dest string, size *int64) error {
 
 func copySparse(w *os.File, r io.Reader, bufSize int64) (int64, error) {
 	var (
-		n              int64
-		eof, hasWrites bool
+		n   int64
+		eof bool
 	)
 
 	zeroBuf := make([]byte, bufSize)
@@ -139,20 +145,15 @@ func copySparse(w *os.File, r io.Reader, bufSize int64) (int64, error) {
 			}
 		}
 		// TODO: qcow2reader should have a method to notify whether buf is zero
-		if bytes.Equal(buf, zeroBuf) {
-			if _, sErr := w.Seek(int64(rN), io.SeekCurrent); sErr != nil {
-				return n, fmt.Errorf("failed seek: %w", sErr)
-			}
-			// no need to ftruncate here
+		if bytes.Equal(buf[:rN], zeroBuf[:rN]) {
 			n += int64(rN)
 		} else {
-			hasWrites = true
-			wN, wErr := w.Write(buf)
+			wN, wErr := w.WriteAt(buf[:rN], n)
 			if wN > 0 {
 				n += int64(wN)
 			}
 			if wErr != nil {
-				return n, fmt.Errorf("failed to read: %w", wErr)
+				return n, fmt.Errorf("failed to write: %w", wErr)
 			}
 			if wN != rN {
 				return n, fmt.Errorf("read %d, but wrote %d bytes", rN, wN)
@@ -160,10 +161,6 @@ func copySparse(w *os.File, r io.Reader, bufSize int64) (int64, error) {
 		}
 	}
 
-	// Ftruncate must be run if the file contains only zeros
-	if !hasWrites {
-		return n, MakeSparse(w, n)
-	}
 	return n, nil
 }
 
@@ -171,5 +168,5 @@ func MakeSparse(f *os.File, n int64) error {
 	if _, err := f.Seek(n, io.SeekStart); err != nil {
 		return err
 	}
-	return osutil.Ftruncate(int(f.Fd()), n)
+	return f.Truncate(n)
 }
