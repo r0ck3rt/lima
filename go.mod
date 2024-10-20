@@ -25,7 +25,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/yamlfmt v0.13.0
 	github.com/invopop/jsonschema v0.12.0
-	github.com/lima-vm/go-qcow2reader v0.2.0
+	github.com/lima-vm/go-qcow2reader v0.2.1
 	github.com/lima-vm/sshocker v0.3.4
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mattn/go-shellwords v1.0.12
@@ -36,6 +36,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/rjeczalik/notify v0.9.3
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/sethvargo/go-password v0.3.1
 	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af
 	github.com/spf13/cobra v1.8.1
